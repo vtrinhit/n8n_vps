@@ -1,5 +1,14 @@
 # Hướng dẫn cài đặt n8n Production trên Ubuntu 24.04 với Docker
 
+## Lịch sử cập nhật
+
+| Version | Ngày | Thay đổi |
+|---------|------|----------|
+| 1.1.0 | 2026-01-28 | Sửa EXECUTIONS_MODE sang queue mode, thêm N8N_SECURE_COOKIE, thêm healthcheck cho n8n, cải thiện backup script |
+| 1.0.0 | 2026-01-27 | Phiên bản đầu tiên |
+
+---
+
 ## Thông tin Server
 - **OS:** Ubuntu 24.04 LTS
 - **CPU:** 2 cores
@@ -82,6 +91,7 @@ services:
       - n8n-network
 
   n8n:
+    # Sử dụng latest hoặc pin version cụ thể (VD: n8nio/n8n:1.70.0) để tránh breaking changes
     image: docker.n8n.io/n8nio/n8n:latest
     container_name: n8n
     restart: always
@@ -105,9 +115,11 @@ services:
 
       # Security
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_SECURE_COOKIE: "true"
 
       # Execution settings - optimized for 3GB RAM
-      EXECUTIONS_MODE: regular
+      # Queue mode: cho phép concurrent executions với Redis
+      EXECUTIONS_MODE: queue
       EXECUTIONS_PROCESS: main
       EXECUTIONS_TIMEOUT: 3600
       EXECUTIONS_TIMEOUT_MAX: 7200
@@ -143,6 +155,12 @@ services:
       - ./data:/home/node/.n8n
     ports:
       - "127.0.0.1:5678:5678"
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --spider -q http://localhost:5678/healthz || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - n8n-network
 
@@ -516,9 +534,13 @@ docker exec n8n-postgres pg_dump -U n8n n8n > $BACKUP_DIR/n8n_db_$DATE.sql
 # Backup n8n data
 tar -czf $BACKUP_DIR/n8n_data_$DATE.tar.gz -C /opt/n8n data
 
+# Backup .env file (QUAN TRỌNG: chứa encryption key)
+cp /opt/n8n/.env $BACKUP_DIR/env_$DATE.backup
+
 # Giữ lại 7 ngày backup
 find $BACKUP_DIR -name "*.sql" -mtime +7 -delete
 find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
+find $BACKUP_DIR -name "*.backup" -mtime +7 -delete
 
 echo "Backup completed: $DATE"
 ```
