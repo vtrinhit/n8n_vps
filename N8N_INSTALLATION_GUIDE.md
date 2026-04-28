@@ -4,6 +4,7 @@
 
 | Version | Ngày | Thay đổi |
 |---------|------|----------|
+| 1.2.0 | 2026-04-28 | Cập nhật theo n8n 2.17.8 (latest stable), pin version trong docker-compose, bật N8N_RUNNERS_ENABLED (task runners), nâng PostgreSQL lên 17-alpine, ghi chú breaking changes 2.x |
 | 1.1.0 | 2026-01-28 | Sửa EXECUTIONS_MODE sang queue mode, thêm N8N_SECURE_COOKIE, thêm healthcheck cho n8n, cải thiện backup script |
 | 1.0.0 | 2026-01-27 | Phiên bản đầu tiên |
 
@@ -17,6 +18,30 @@
 - **IP:** 103.216.117.22
 - **Domain:** n8n.socialmate.site
 - **SSL:** Let's Encrypt (Certbot) + Cloudflare Full (strict)
+- **n8n version:** `2.17.8` (latest stable, 2026-04-27)
+
+---
+
+## Lưu ý quan trọng khi nâng từ n8n 1.x lên 2.x
+
+Nếu bạn đang chạy n8n 1.x và muốn nâng lên 2.x, hãy đọc kỹ những điểm sau trước khi `docker compose pull`:
+
+1. **Backup bắt buộc trước khi upgrade**
+   - Backup `data/`, database PostgreSQL và file `.env` (chứa `N8N_ENCRYPTION_KEY`).
+   - Xem `Bước 10.2 - Backup Script` bên dưới để chạy `./backup.sh` trước khi upgrade.
+
+2. **Task Runners là mặc định**
+   - Code node (JavaScript/Python) chạy trong process riêng (task runner) thay vì process chính.
+   - Đặt `N8N_RUNNERS_ENABLED=true` (đã có trong guide). Variable cũ `N8N_RUNNERS_DISABLED` không còn dùng.
+
+3. **Không downgrade sau khi upgrade**
+   - Schema database sau khi migrate sang 2.x sẽ không tương thích ngược với 1.x. Hãy giữ backup để rollback nếu cần.
+
+4. **Pin version trong production**
+   - Dùng tag cụ thể (vd `2.17.8`) thay vì `latest` để tránh tự động pull bản có breaking change.
+
+5. **Kiểm tra release notes**
+   - Tham khảo: https://docs.n8n.io/release-notes/ trước mỗi lần upgrade major.
 
 ---
 
@@ -72,7 +97,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: n8n-postgres
     restart: always
     environment:
@@ -91,8 +116,10 @@ services:
       - n8n-network
 
   n8n:
-    # Sử dụng latest hoặc pin version cụ thể (VD: n8nio/n8n:1.70.0) để tránh breaking changes
-    image: docker.n8n.io/n8nio/n8n:latest
+    # Pin version cụ thể để tránh breaking changes khi pull mới (recommended).
+    # Latest stable tại thời điểm cập nhật guide: 2.17.8 (2026-04-27).
+    # Có thể đổi sang :latest nếu muốn auto-update theo bản mới nhất.
+    image: docker.n8n.io/n8nio/n8n:2.17.8
     container_name: n8n
     restart: always
     depends_on:
@@ -144,8 +171,9 @@ services:
       N8N_LOG_LEVEL: info
       N8N_LOG_OUTPUT: console
 
-      # Disable Python Task Runner (tránh warning nếu không dùng Python nodes)
-      N8N_RUNNERS_DISABLED: true
+      # Task Runners: từ n8n 2.x, Code node chạy trong task runner riêng.
+      # Bắt buộc bật (true) để Code node hoạt động đúng và an toàn.
+      N8N_RUNNERS_ENABLED: "true"
 
       # Disable diagnostics (optional)
       N8N_DIAGNOSTICS_ENABLED: false
@@ -642,8 +670,16 @@ docker compose down
 docker compose up -d
 
 # Update n8n lên version mới
+# 1. Backup trước khi update (QUAN TRỌNG)
+/opt/n8n/backup.sh
+# 2. Sửa tag image trong docker-compose.yml (VD: 2.17.8 → bản mới hơn)
+#    Hoặc dùng :latest nếu chấp nhận auto-update
+nano /opt/n8n/docker-compose.yml
+# 3. Pull image mới và restart
 docker compose pull
 docker compose up -d
+# 4. Kiểm tra log để verify migration database thành công
+docker compose logs -f n8n
 
 # Vào PostgreSQL shell
 docker exec -it n8n-postgres psql -U n8n -d n8n
