@@ -27,12 +27,14 @@ Hướng dẫn chi tiết cài đặt n8n Production trên Ubuntu 24.04 với Do
 
 ## Stack
 
-| Service    | Image                  | Purpose           |
-|------------|------------------------|-------------------|
-| n8n        | n8nio/n8n:latest       | Workflow Engine   |
-| PostgreSQL | postgres:16-alpine     | Database          |
-| Redis      | redis:7-alpine         | Queue/Cache       |
-| Nginx      | System package         | Reverse Proxy     |
+| Service    | Image                              | Purpose           |
+|------------|------------------------------------|-------------------|
+| n8n        | docker.n8n.io/n8nio/n8n:2.17.8     | Workflow Engine   |
+| PostgreSQL | postgres:17-alpine                 | Database          |
+| Redis      | redis:7-alpine                     | Queue/Cache       |
+| Nginx      | System package                     | Reverse Proxy     |
+
+> **n8n version:** Pin sang `2.17.8` (latest stable, 2026-04-27). Xem [N8N_INSTALLATION_GUIDE.md](N8N_INSTALLATION_GUIDE.md#lưu-ý-quan-trọng-khi-nâng-từ-n8n-1x-lên-2x) cho hướng dẫn upgrade từ 1.x.
 
 ## Directory Structure
 
